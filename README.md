@@ -4,6 +4,18 @@ A simple and elegant file tree viewer for Neovim, built with love and simplicity
 
 ## Installation
 
+### Using vim-pack
+```lua
+vim.pack.add({
+  -- ... Your other plugins
+  { src = "https://github.com/enheit/mltv" },
+})
+
+require("mltv").setup()
+
+vim.keymap.set('n', '<leader>e', ':MLTVToggle<CR>', { noremap = true, silent = true })
+```
+
 ### Using lazy.nvim
 ```lua
 {
