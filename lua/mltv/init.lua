@@ -4,7 +4,7 @@ local M = {}
 local default_config = {
   split_command = "sp",
   buf_name = "[My Lovely Tree Viewer]",
-  mode = "keep"
+  mode = "dive"
 }
 
 local config = {}
@@ -36,7 +36,7 @@ local function get_directory_contents(path)
   for line in handle:lines() do
     if not line:match("^total") and not line:match("%s%.%s") and not line:match("%s%.%.%s") then
       local permissions, links, owner, group, size, month, day, time, name = line:match(
-      "^(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(.+)$")
+        "^(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(.+)$")
       if name and name ~= "." and name ~= ".." then
         local is_dir = permissions:sub(1, 1) == "d"
         table.insert(items, {
@@ -73,7 +73,7 @@ local function get_expanded_tree(base_path, depth)
   for line in handle:lines() do
     if not line:match("^total") and not line:match("%s%.%s") and not line:match("%s%.%.%s") then
       local permissions, links, owner, group, size, month, day, time, name = line:match(
-      "^(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(.+)$")
+        "^(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(.+)$")
       if name and name ~= "." and name ~= ".." then
         local is_dir = permissions:sub(1, 1) == "d"
         local full_path = base_path .. "/" .. name
@@ -98,10 +98,22 @@ local function get_expanded_tree(base_path, depth)
   end)
   for _, item in ipairs(current_level_items) do
     table.insert(items, item)
-    if item.is_directory and expanded_folders[item.full_path] then
-      local sub_items = get_expanded_tree(item.full_path, depth + 1)
-      for _, sub_item in ipairs(sub_items) do
-        table.insert(items, sub_item)
+    if item.is_directory then
+      if expanded_folders[item.full_path] then
+        local sub_items = get_expanded_tree(item.full_path, depth + 1)
+        if #sub_items == 0 then
+          -- Add virtual placeholder for empty folder
+          table.insert(items, {
+            name = "",
+            is_directory = false,
+            full_path = item.full_path .. "/.",
+            depth = depth + 1
+          })
+        else
+          for _, sub_item in ipairs(sub_items) do
+            table.insert(items, sub_item)
+          end
+        end
       end
     end
   end
@@ -121,11 +133,21 @@ local function populate_buffer(buf, path)
   local lines = {}
   -- Add root folder as the first line
   local root_name = vim.fn.fnamemodify(path, ":t")
-  root_name = root_name == "" and path or root_name  -- fallback for /
+  root_name = root_name == "" and path or root_name
   table.insert(lines, root_name .. "/")
+  -- Check if directory is empty and add placeholder in both modes
+  if #items == 0 then
+    -- Add virtual placeholder for empty directory
+    table.insert(items, {
+      name = "",
+      is_directory = false,
+      full_path = path .. "/.",
+      depth = 0
+    })
+  end
   -- Shift existing items by depth +1
   for i, item in ipairs(items) do
-    local indent = string.rep("| ", item.depth + 1) -- add +1 to depth
+    local indent = string.rep("| ", item.depth + 1)
     local display_name = item.is_directory and (item.name .. "/") or item.name
     table.insert(lines, indent .. display_name)
   end
@@ -135,7 +157,7 @@ local function populate_buffer(buf, path)
   -- Highlight root folder
   vim.api.nvim_buf_add_highlight(buf, ns_id, "TreeViewerFolder", 0, 0, #root_name)
   vim.api.nvim_buf_add_highlight(buf, ns_id, "TreeViewerSlash", 0, #root_name, #root_name + 1)
-  -- Highlight all other items (note: line numbers are now shifted by +1)
+  -- Highlight all other items
   for i, item in ipairs(items) do
     local start_col = (item.depth + 1) * 2
     if item.is_directory then
@@ -153,11 +175,9 @@ local function position_cursor_on_item(target_name)
   end
   for i, item in ipairs(current_items) do
     if item.name == target_name then
-      -- Add +1 to account for root folder line
       vim.api.nvim_win_set_cursor(treeviewer_win, { i + 1, 0 })
       local ns_id = vim.api.nvim_create_namespace("treeviewer_current_file")
       vim.api.nvim_buf_clear_namespace(treeviewer_buf, ns_id, 0, -1)
-      -- Highlight is also shifted by +1
       vim.api.nvim_buf_add_highlight(treeviewer_buf, ns_id, "CursorLine", i, 0, -1)
       return true
     end
@@ -253,21 +273,17 @@ end
 local function get_visual_selection()
   local start_line = vim.fn.line("'<")
   local end_line = vim.fn.line("'>")
-  -- If marks are invalid (0 or beyond buffer), try to get from current visual selection
   local total_lines = vim.api.nvim_buf_line_count(treeviewer_buf)
   if start_line == 0 or end_line == 0 or start_line > total_lines or end_line > total_lines then
-    -- Visual marks not set properly, try alternative method
     local start_pos = vim.fn.getpos("'<")
     local end_pos = vim.fn.getpos("'>")
     if start_pos[2] == 0 or end_pos[2] == 0 then
-      -- Still no valid marks, return empty
       return {}
     end
     start_line = start_pos[2]
     end_line = end_pos[2]
   end
   local selected_items = {}
-  -- Adjust for root folder line - subtract 1 from line numbers
   for i = math.max(1, start_line - 1), end_line - 1 do
     if current_items and current_items[i] then
       table.insert(selected_items, current_items[i])
@@ -283,7 +299,6 @@ local function highlight_selected_items(items, highlight_group)
   for _, item in ipairs(items) do
     for i, current_item in ipairs(current_items) do
       if current_item.full_path == item.full_path then
-        -- Add +1 to account for root folder line when highlighting
         vim.api.nvim_buf_add_highlight(treeviewer_buf, ns_id, highlight_group, i, 0, -1)
         break
       end
@@ -301,16 +316,15 @@ end
 local function split_filename(name)
   local idx = name:match("^.*()%.")
   if idx then
-    return name:sub(1, idx - 1), name:sub(idx) -- base, .ext
+    return name:sub(1, idx - 1), name:sub(idx)
   else
-    return name, ""                            -- no extension
+    return name, ""
   end
 end
 
 -- Handle rename
 local function handle_rename(include_extension)
   local cursor_line = vim.api.nvim_win_get_cursor(treeviewer_win)[1]
-  -- Adjust for root folder line - subtract 1
   if cursor_line <= 1 or not current_items or cursor_line - 1 > #current_items then
     return
   end
@@ -328,7 +342,7 @@ local function handle_rename(include_extension)
     end
     input = vim.trim(input)
     if not include_extension then
-      input = input .. extension -- put back extension automatically
+      input = input .. extension
     end
     if input == selected_item.name then
       print("Name unchanged")
@@ -366,31 +380,23 @@ local function handle_copy()
   local cursor_pos = vim.api.nvim_win_get_cursor(treeviewer_win)
   local mode = vim.api.nvim_get_mode().mode
   if mode == 'V' then
-    -- We're currently in visual line mode
-    -- Get the visual selection range directly from the current visual selection
     local start_line = vim.fn.line("v")
     local end_line = cursor_pos[1]
-    -- Ensure start_line <= end_line
     if start_line > end_line then
       start_line, end_line = end_line, start_line
     end
-    -- Adjust for root folder line - subtract 1 and ensure we don't go below 1
     for i = math.max(1, start_line - 1), end_line - 1 do
       if current_items and current_items[i] then
         table.insert(selected_items, current_items[i])
       end
     end
-    -- Exit visual mode
     vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes('<Esc>', true, false, true), 'x', false)
   else
-    -- Normal mode - single item
     local cursor_line = cursor_pos[1]
-    -- Adjust for root folder line - subtract 1
     if cursor_line > 1 and current_items and cursor_line - 1 <= #current_items then
       table.insert(selected_items, current_items[cursor_line - 1])
     end
   end
-  -- Restore cursor position
   vim.api.nvim_win_set_cursor(treeviewer_win, cursor_pos)
   if #selected_items == 0 then
     print("No items selected")
@@ -413,31 +419,23 @@ local function handle_cut()
   local cursor_pos = vim.api.nvim_win_get_cursor(treeviewer_win)
   local mode = vim.api.nvim_get_mode().mode
   if mode == 'V' then
-    -- We're currently in visual line mode
-    -- Get the visual selection range directly from the current visual selection
     local start_line = vim.fn.line("v")
     local end_line = cursor_pos[1]
-    -- Ensure start_line <= end_line
     if start_line > end_line then
       start_line, end_line = end_line, start_line
     end
-    -- Adjust for root folder line - subtract 1 and ensure we don't go below 1
     for i = math.max(1, start_line - 1), end_line - 1 do
       if current_items and current_items[i] then
         table.insert(selected_items, current_items[i])
       end
     end
-    -- Exit visual mode
     vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes('<Esc>', true, false, true), 'x', false)
   else
-    -- Normal mode - single item
     local cursor_line = cursor_pos[1]
-    -- Adjust for root folder line - subtract 1
     if cursor_line > 1 and current_items and cursor_line - 1 <= #current_items then
       table.insert(selected_items, current_items[cursor_line - 1])
     end
   end
-  -- Restore cursor position
   vim.api.nvim_win_set_cursor(treeviewer_win, cursor_pos)
   if #selected_items == 0 then
     print("No items selected")
@@ -461,7 +459,6 @@ local function handle_paste()
     return
   end
   local cursor_line = vim.api.nvim_win_get_cursor(treeviewer_win)[1]
-  -- Adjust for root folder line - subtract 1
   if cursor_line <= 1 or not current_items or cursor_line - 1 > #current_items then
     return
   end
@@ -528,7 +525,6 @@ end
 -- Handle add
 local function handle_add()
   local cursor_line = vim.api.nvim_win_get_cursor(treeviewer_win)[1]
-  -- If on root folder line (line 1) or no items, use current_path
   local target_dir
   if cursor_line <= 1 or not current_items or cursor_line - 1 > #current_items then
     target_dir = current_path
@@ -579,12 +575,14 @@ local function handle_add()
       print("Created " .. item_type .. ": " .. item_name)
       vim.bo[treeviewer_buf].modifiable = true
       if config.mode == "keep" then
-        -- If we created in a directory that was selected, expand it
         if cursor_line > 1 and current_items and cursor_line - 1 <= #current_items then
           local selected_item = current_items[cursor_line - 1]
           if selected_item.is_directory then
             expanded_folders[selected_item.full_path] = true
           end
+        end
+        if is_directory then
+          expanded_folders[target_path] = nil
         end
         populate_buffer(treeviewer_buf, current_path)
       else
@@ -601,16 +599,39 @@ local function handle_add()
   end)
 end
 
+local function collapse_if_empty(folder_path)
+  if not expanded_folders[folder_path] then
+    return
+  end
+  local handle = io.popen('ls -la "' .. folder_path .. '" 2>/dev/null')
+  if not handle then
+    return
+  end
+  local has_items = false
+  for line in handle:lines() do
+    if not line:match("^total") and not line:match("%s%.%s") and not line:match("%s%.%.%s") then
+      local permissions, links, owner, group, size, month, day, time, name = line:match(
+        "^(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(.+)$")
+      if name and name ~= "." and name ~= ".." then
+        has_items = true
+        break
+      end
+    end
+  end
+  handle:close()
+  if not has_items then
+    expanded_folders[folder_path] = nil
+  end
+end
+
 -- Perform deletion function
 local function perform_deletion(selected_items, cursor_pos)
   if #selected_items == 0 then
     print("No items selected")
     return
   end
-  -- Clear visual selection marks immediately
   vim.cmd("normal! \\<Esc>")
   clear_selection_highlighting()
-  -- Create confirmation prompt
   local prompt
   if #selected_items == 1 then
     local item_type = selected_items[1].is_directory and "folder" or "file"
@@ -630,6 +651,7 @@ local function perform_deletion(selected_items, cursor_pos)
     if input == "y" or input == "yes" then
       local successful_deletions = 0
       local failed_deletions = 0
+      local parent_folders_to_check = {}
       for _, item in ipairs(selected_items) do
         local cmd = item.is_directory
             and string.format('rm -rf "%s"', item.full_path)
@@ -637,10 +659,15 @@ local function perform_deletion(selected_items, cursor_pos)
         local result = os.execute(cmd)
         if result == 0 then
           successful_deletions = successful_deletions + 1
+          local parent_dir = vim.fn.fnamemodify(item.full_path, ":h")
+          parent_folders_to_check[parent_dir] = true
         else
           failed_deletions = failed_deletions + 1
           print("Failed to remove: " .. item.name)
         end
+      end
+      for parent_dir, _ in pairs(parent_folders_to_check) do
+        collapse_if_empty(parent_dir)
       end
       if successful_deletions > 0 then
         if #selected_items == 1 then
@@ -653,12 +680,10 @@ local function perform_deletion(selected_items, cursor_pos)
       if failed_deletions > 0 then
         print("Failed to remove " .. failed_deletions .. " items")
       end
-      -- Refresh buffer
       if treeviewer_buf and vim.api.nvim_buf_is_valid(treeviewer_buf) then
         vim.bo[treeviewer_buf].modifiable = true
         populate_buffer(treeviewer_buf, current_path)
         vim.bo[treeviewer_buf].modifiable = false
-        -- Reset cursor position (account for root folder line)
         if cursor_pos and current_items then
           local new_cursor_line = math.min(cursor_pos[1], #current_items + 1)
           if new_cursor_line > 1 and treeviewer_win and vim.api.nvim_win_is_valid(treeviewer_win) then
@@ -669,7 +694,6 @@ local function perform_deletion(selected_items, cursor_pos)
     else
       print("Deletion cancelled")
     end
-    -- Always return focus and exit visual mode
     if treeviewer_win and vim.api.nvim_win_is_valid(treeviewer_win) then
       vim.api.nvim_set_current_win(treeviewer_win)
       vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes('<Esc>', true, false, true), 'n', true)
@@ -677,20 +701,16 @@ local function perform_deletion(selected_items, cursor_pos)
   end)
 end
 
--- Handle delete
 local function handle_delete()
   local selected_items = {}
   local cursor_pos = vim.api.nvim_win_get_cursor(treeviewer_win)
   local mode = vim.api.nvim_get_mode().mode
   if mode == 'V' then
-    -- We're currently in visual line mode
     local start_line = vim.fn.line("v")
     local end_line = cursor_pos[1]
-    -- Ensure start_line <= end_line
     if start_line > end_line then
       start_line, end_line = end_line, start_line
     end
-    -- Adjust for root folder line - subtract 1 and ensure we don't go below 1
     for i = math.max(1, start_line - 1), end_line - 1 do
       if current_items and current_items[i] then
         table.insert(selected_items, current_items[i])
@@ -698,9 +718,7 @@ local function handle_delete()
     end
     perform_deletion(selected_items, cursor_pos)
   else
-    -- Normal mode - single item
     local cursor_line = cursor_pos[1]
-    -- Adjust for root folder line - subtract 1
     if cursor_line > 1 and current_items and cursor_line - 1 <= #current_items then
       table.insert(selected_items, current_items[cursor_line - 1])
     end
@@ -710,15 +728,47 @@ end
 
 local function handle_enter()
   local cursor_line = vim.api.nvim_win_get_cursor(treeviewer_win)[1]
-  -- Handle root folder click (line 1) - do nothing or go to parent
   if cursor_line <= 1 then
     return
   end
-  -- Adjust for root folder line - subtract 1
   if not current_items or cursor_line - 1 > #current_items then
     return
   end
   local selected_item = current_items[cursor_line - 1]
+  -- Handle empty folder dummy item
+  if selected_item.name == "" and selected_item.full_path:match("/%.$") then
+    if config.mode == "dive" then
+      if not current_path then
+        return
+      end
+      local parent_path = vim.fn.fnamemodify(current_path, ":h")
+      if parent_path == current_path then
+        return
+      end
+      vim.bo[treeviewer_buf].modifiable = true
+      populate_buffer(treeviewer_buf, parent_path)
+      vim.bo[treeviewer_buf].modifiable = false
+      if #navigation_history > 0 then
+        local last_location = table.remove(navigation_history)
+        if last_location.path == parent_path then
+          position_cursor_on_item(last_location.focus_item)
+        else
+          highlight_current_file()
+        end
+      else
+        highlight_current_file()
+      end
+    else
+      local parent_path = selected_item.full_path:gsub("/%.$", "")
+      expanded_folders[parent_path] = nil
+      vim.bo[treeviewer_buf].modifiable = true
+      populate_buffer(treeviewer_buf, current_path)
+      vim.bo[treeviewer_buf].modifiable = false
+      local parent_name = vim.fn.fnamemodify(parent_path, ":t")
+      position_cursor_on_item(parent_name)
+    end
+    return
+  end
   if selected_item.is_directory then
     if config.mode == "dive" then
       table.insert(navigation_history, {
@@ -783,7 +833,6 @@ local function handle_h()
     end
   else
     local cursor_line = vim.api.nvim_win_get_cursor(treeviewer_win)[1]
-    -- Handle root folder or invalid line
     if cursor_line <= 1 or not current_items or cursor_line - 1 > #current_items then
       return
     end
@@ -798,10 +847,26 @@ local function handle_h()
   end
 end
 
+function M.toggle_mode()
+  config.mode = config.mode == "dive" and "keep" or "dive"
+  navigation_history = {}
+  expanded_folders = {}
+  if treeviewer_buf and vim.api.nvim_buf_is_valid(treeviewer_buf) then
+    vim.bo[treeviewer_buf].modifiable = true
+    populate_buffer(treeviewer_buf, current_path)
+    vim.bo[treeviewer_buf].modifiable = false
+    highlight_current_file()
+  end
+  print("TreeViewer mode: " .. config.mode)
+end
+
 local function setup_keymaps(buf)
   vim.keymap.set('n', '<CR>', handle_enter, { buffer = buf, silent = true })
   vim.keymap.set('n', 'l', handle_l, { buffer = buf, silent = true })
   vim.keymap.set('n', 'h', handle_h, { buffer = buf, silent = true })
+  vim.keymap.set('n', 'm', function()
+    M.toggle_mode()
+  end, { buffer = buf, silent = true })
   vim.keymap.set({ 'n', 'v' }, 'y', handle_copy, { buffer = buf, silent = true })
   vim.keymap.set({ 'n', 'v' }, 'x', handle_cut, { buffer = buf, silent = true })
   vim.keymap.set('n', 'p', handle_paste, { buffer = buf, silent = true })
