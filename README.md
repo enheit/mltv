@@ -7,7 +7,10 @@ A simple and elegant file tree viewer for Neovim, built with love and simplicity
 
 ## Installation
 
-### Using vim-pack
+<details>
+<summary>Using vim-pack</summary>
+
+  
 ```lua
 vim.pack.add({
   -- ... Your other plugins
@@ -19,7 +22,12 @@ require("mltv").setup()
 vim.keymap.set('n', '<leader>e', ':MLTVToggle<CR>', { noremap = true, silent = true })
 ```
 
-### Using lazy.nvim
+</details>
+
+<details>
+<summary>Using lazy.nvim</summary>
+
+
 ```lua
 {
   'enheit/mltv',
@@ -29,7 +37,11 @@ vim.keymap.set('n', '<leader>e', ':MLTVToggle<CR>', { noremap = true, silent = t
 }
 ```
 
-### Using packer.nvim
+</details>
+
+
+<details>
+<summary>Using packer.nvim</summary>
 
 ```lua
 use {
@@ -40,8 +52,12 @@ use {
 }
 ```
 
+</details>
 
-### Using vim-plug
+
+<details>
+<summary>Using vim-plug</summary>
+  
 
 ```
 Plug 'enheit/mltv'
@@ -51,6 +67,8 @@ Then add to your `init.lua`:
 ```lua
 require('mltv').setup()
 ```
+
+</details>
 
 ## Configuration
 
