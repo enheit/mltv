@@ -2,6 +2,9 @@
 
 A simple and elegant file tree viewer for Neovim, built with love and simplicity in mind.
 
+![ezgif-16ff263a57097d](https://github.com/user-attachments/assets/4a21e22e-fd94-4f83-84ee-1c492cceee99)
+
+
 ## Installation
 
 ### Using vim-pack
