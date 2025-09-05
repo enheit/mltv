@@ -1,4 +1,4 @@
-# MLTV - My Lovely Tree Viewer
+# MLTV - My Lovely Tree Viewer ❤️
 
 A simple and elegant file tree viewer for Neovim, built with love and simplicity in mind.
 
