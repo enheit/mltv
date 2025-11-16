@@ -956,6 +956,21 @@ end
 function M.setup(user_config)
   config = vim.tbl_deep_extend("force", default_config, user_config or {})
   setup_highlights()
+
+  -- Refresh highlights when colorscheme changes
+  vim.api.nvim_create_autocmd("ColorScheme", {
+    pattern = "*",
+    callback = function()
+      setup_highlights()
+      -- Refresh the tree viewer buffer if it's open
+      if treeviewer_buf and vim.api.nvim_buf_is_valid(treeviewer_buf) and current_path then
+        vim.bo[treeviewer_buf].modifiable = true
+        populate_buffer(treeviewer_buf, current_path)
+        vim.bo[treeviewer_buf].modifiable = false
+      end
+    end,
+    desc = "Update MLTV highlights when colorscheme changes"
+  })
 end
 
 return M
