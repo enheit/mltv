@@ -169,12 +169,14 @@ local function populate_buffer(buf, path)
 end
 
 -- Function to position cursor on item
-local function position_cursor_on_item(target_name)
+-- Can accept either a full path or just a name (for backward compatibility)
+local function position_cursor_on_item(target_identifier)
   if not current_items then
     return false
   end
   for i, item in ipairs(current_items) do
-    if item.name == target_name then
+    -- Try to match by full path first, then fall back to name
+    if item.full_path == target_identifier or item.name == target_identifier then
       vim.api.nvim_win_set_cursor(treeviewer_win, { i + 1, 0 })
       local ns_id = vim.api.nvim_create_namespace("treeviewer_current_file")
       vim.api.nvim_buf_clear_namespace(treeviewer_buf, ns_id, 0, -1)
@@ -764,8 +766,7 @@ local function handle_enter()
       vim.bo[treeviewer_buf].modifiable = true
       populate_buffer(treeviewer_buf, current_path)
       vim.bo[treeviewer_buf].modifiable = false
-      local parent_name = vim.fn.fnamemodify(parent_path, ":t")
-      position_cursor_on_item(parent_name)
+      position_cursor_on_item(parent_path)
     end
     return
   end
@@ -787,7 +788,7 @@ local function handle_enter()
       vim.bo[treeviewer_buf].modifiable = true
       populate_buffer(treeviewer_buf, current_path)
       vim.bo[treeviewer_buf].modifiable = false
-      position_cursor_on_item(selected_item.name)
+      position_cursor_on_item(selected_item.full_path)
     end
   else
     if original_win and vim.api.nvim_win_is_valid(original_win) then
@@ -842,7 +843,7 @@ local function handle_h()
       vim.bo[treeviewer_buf].modifiable = true
       populate_buffer(treeviewer_buf, current_path)
       vim.bo[treeviewer_buf].modifiable = false
-      position_cursor_on_item(selected_item.name)
+      position_cursor_on_item(selected_item.full_path)
     end
   end
 end
