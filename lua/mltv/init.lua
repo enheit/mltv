@@ -23,8 +23,12 @@ local clipboard_mode = nil
 
 -- Setup highlights
 local function setup_highlights()
-  vim.cmd("highlight default link TreeViewerFolder Directory")
-  vim.cmd("highlight default link TreeViewerSlash Delimiter")
+  -- Remove 'default' to ensure links update when themes change
+  vim.cmd("highlight link TreeViewerFolder Directory")
+  vim.cmd("highlight link TreeViewerSlash Delimiter")
+  -- Use distinct highlight groups for current file and selections
+  vim.cmd("highlight link TreeViewerCurrentFile Search")
+  vim.cmd("highlight link TreeViewerSelection Visual")
 end
 
 -- Function to get directory contents
@@ -181,7 +185,7 @@ local function position_cursor_on_item(target_identifier)
       vim.api.nvim_win_set_cursor(treeviewer_win, { i + 1, 0 })
       local ns_id = vim.api.nvim_create_namespace("treeviewer_current_file")
       vim.api.nvim_buf_clear_namespace(treeviewer_buf, ns_id, 0, -1)
-      vim.api.nvim_buf_add_highlight(treeviewer_buf, ns_id, "CursorLine", i, 0, -1)
+      vim.api.nvim_buf_add_highlight(treeviewer_buf, ns_id, "TreeViewerCurrentFile", i, 0, -1)
       return true
     end
   end
@@ -446,7 +450,7 @@ local function handle_cut()
   end
   clipboard = selected_items
   clipboard_mode = "cut"
-  highlight_selected_items(selected_items, "Comment")
+  highlight_selected_items(selected_items, "TreeViewerSelection")
   if #selected_items == 1 then
     local item_type = selected_items[1].is_directory and "folder" or "file"
     print("Cut " .. item_type .. ": " .. selected_items[1].name)
@@ -914,6 +918,8 @@ local function setup_keymaps(buf)
 end
 
 local function create_treeviewer()
+  -- Refresh highlights to pick up current theme
+  setup_highlights()
   original_win = vim.api.nvim_get_current_win()
   navigation_history = {}
   local cwd = vim.fn.getcwd()
