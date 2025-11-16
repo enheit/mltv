@@ -24,7 +24,7 @@ local clipboard_mode = nil
 -- Setup highlights
 local function setup_highlights()
   -- Remove 'default' to ensure links update when themes change
-  vim.cmd("highlight link TreeViewerFolder Directory")
+  vim.cmd("highlight link TreeViewerFolder Function")
   vim.cmd("highlight link TreeViewerSlash Delimiter")
   -- Use Visual highlight for selections
   vim.cmd("highlight link TreeViewerSelection Visual")
