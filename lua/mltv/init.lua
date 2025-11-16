@@ -4,7 +4,7 @@ local M = {}
 local default_config = {
   split_command = "sp",
   buf_name = "[My Lovely Tree Viewer]",
-  mode = "dive"
+  mode = "keep"
 }
 
 local config = {}
