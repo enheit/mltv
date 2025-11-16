@@ -23,7 +23,7 @@ local clipboard_mode = nil
 -- Setup highlights
 local function setup_highlights()
   vim.cmd("highlight default link TreeViewerFolder Directory")
-  vim.cmd("highlight default TreeViewerSlash guifg=#f1c1bd ctermfg=75")
+  vim.cmd("highlight default link TreeViewerSlash Delimiter")
 end
 
 -- Function to get directory contents
