@@ -17,6 +17,7 @@ local current_path = nil
 local current_items = nil
 local navigation_history = {}
 local expanded_folders = {}
+local saved_expanded_folders = nil
 local clipboard = nil
 local clipboard_mode = nil
 
@@ -852,6 +853,7 @@ function M.toggle_mode()
   config.mode = config.mode == "dive" and "keep" or "dive"
   navigation_history = {}
   expanded_folders = {}
+  saved_expanded_folders = nil
   if treeviewer_buf and vim.api.nvim_buf_is_valid(treeviewer_buf) then
     vim.bo[treeviewer_buf].modifiable = true
     populate_buffer(treeviewer_buf, current_path)
@@ -861,12 +863,39 @@ function M.toggle_mode()
   print("TreeViewer mode: " .. config.mode)
 end
 
+function M.toggle_collapse_all()
+  if not treeviewer_buf or not vim.api.nvim_buf_is_valid(treeviewer_buf) then
+    return
+  end
+
+  if saved_expanded_folders then
+    -- Restore previously expanded folders
+    expanded_folders = saved_expanded_folders
+    saved_expanded_folders = nil
+    print("Expanded all folders")
+  else
+    -- Save current state and collapse all
+    saved_expanded_folders = vim.deepcopy(expanded_folders)
+    expanded_folders = {}
+    print("Collapsed all folders")
+  end
+
+  -- Refresh the buffer
+  vim.bo[treeviewer_buf].modifiable = true
+  populate_buffer(treeviewer_buf, current_path)
+  vim.bo[treeviewer_buf].modifiable = false
+  highlight_current_file()
+end
+
 local function setup_keymaps(buf)
   vim.keymap.set('n', '<CR>', handle_enter, { buffer = buf, silent = true })
   vim.keymap.set('n', 'l', handle_l, { buffer = buf, silent = true })
   vim.keymap.set('n', 'h', handle_h, { buffer = buf, silent = true })
   vim.keymap.set('n', 'm', function()
     M.toggle_mode()
+  end, { buffer = buf, silent = true })
+  vim.keymap.set('n', 'W', function()
+    M.toggle_collapse_all()
   end, { buffer = buf, silent = true })
   vim.keymap.set({ 'n', 'v' }, 'y', handle_copy, { buffer = buf, silent = true })
   vim.keymap.set({ 'n', 'v' }, 'x', handle_cut, { buffer = buf, silent = true })
@@ -916,6 +945,7 @@ function M.toggle()
     original_win = nil
     navigation_history = {}
     expanded_folders = {}
+    saved_expanded_folders = nil
   else
     create_treeviewer()
   end
