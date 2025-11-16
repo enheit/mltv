@@ -26,8 +26,7 @@ local function setup_highlights()
   -- Remove 'default' to ensure links update when themes change
   vim.cmd("highlight link TreeViewerFolder Directory")
   vim.cmd("highlight link TreeViewerSlash Delimiter")
-  -- Use distinct highlight groups for current file and selections
-  vim.cmd("highlight link TreeViewerCurrentFile Search")
+  -- Use Visual highlight for selections
   vim.cmd("highlight link TreeViewerSelection Visual")
 end
 
@@ -183,9 +182,6 @@ local function position_cursor_on_item(target_identifier)
     -- Try to match by full path first, then fall back to name
     if item.full_path == target_identifier or item.name == target_identifier then
       vim.api.nvim_win_set_cursor(treeviewer_win, { i + 1, 0 })
-      local ns_id = vim.api.nvim_create_namespace("treeviewer_current_file")
-      vim.api.nvim_buf_clear_namespace(treeviewer_buf, ns_id, 0, -1)
-      vim.api.nvim_buf_add_highlight(treeviewer_buf, ns_id, "TreeViewerCurrentFile", i, 0, -1)
       return true
     end
   end
