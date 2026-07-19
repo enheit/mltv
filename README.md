@@ -128,15 +128,23 @@ vim.keymap.set('n', '<leader>e', '<cmd>MLTVToggle<cr>', { desc = 'Toggle file tr
 
 ## Tips
 
-- Use visual mode (V) to select multiple files for batch operations
+- Use visual mode (`v`, `V`, or `Ctrl-V`) to select multiple files for batch operations
 - Files ending with / in the create prompt will be created as directories
-- Empty directories show a | indicator
+- Empty directories show an italic *Empty* placeholder
 - Cut files are highlighted until pasted or cleared with Esc
-- In dive mode, press `Enter` or `l` on the | indicator to go back
-- In keep mode, press `Enter` or `l` on the | indicator to collapse the folder
+- In dive mode, press `Enter` or `l` on the *Empty* placeholder to go back
+- In keep mode, press `Enter` or `l` on the *Empty* placeholder to collapse the folder
 
 ## Motivation
 I wanted the simplicity of Neovim's built-in `netrw` but with intuitive commands that actually make sense. Instead of memorizing obscure keybindings, MLTV uses familiar vim motions (h/l for navigation) and standard operations (y/x/p/d for copy/cut/paste/delete).
+
+## Development
+
+Run the headless test suite from the repo root:
+
+```sh
+nvim --headless --clean --cmd "set rtp+=." -l tests/mltv_spec.lua
+```
 
 ## License
 MIT License
